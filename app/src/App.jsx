@@ -4,6 +4,7 @@ import Header from './components/Header';
 import PlanPanel from './components/PlanPanel';
 import NotesPanel from './components/NotesPanel';
 import SettingsModal from './components/SettingsModal';
+import SynthesisModal from './components/SynthesisModal';
 import { SESSIONS, DEFAULT_PLAN } from './data/constants';
 
 const STORAGE_KEY = 'bernafon_notes_data';
@@ -45,6 +46,9 @@ function App() {
   const [chat, setChat] = useState(initialState?.chat || { history: [] });
   const [activeTab, setActiveTab] = useState('notes'); // 'notes' or 'chat'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSynthesisOpen, setIsSynthesisOpen] = useState(false);
+  const [synthesisText, setSynthesisText] = useState("");
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
 
   useEffect(() => {
     const stateToSave = { user, settings, notes, chat };
@@ -145,6 +149,75 @@ function App() {
     }
   };
 
+  const handleSynthesize = async () => {
+    const apiKey = settings.apiKey || import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey) {
+      alert("Veuillez entrer votre clé API OpenAI dans les paramètres.");
+      return;
+    }
+
+    setIsSynthesizing(true);
+    setIsSynthesisOpen(true);
+
+    const blocks = SESSIONS.map(s => {
+      const a = (notes[s.id]?.inspire || "").trim();
+      const b = (notes[s.id]?.actions || "").trim();
+      return `### ${s.title}\n- Inspirations : ${a || "(vide)"}\n- Actions envisagées : ${b || "(vide)"}`;
+    }).join("\n\n");
+
+    const prompt = `Tu es Coach IA pour commerciaux Bernafon. Génère une synthèse personnelle structurée en français pour ${user.fullName || "le participant"}.
+    Exigences :
+    1) TL;DR en 5 puces.
+    2) Synthèse par session (1 à 9), 4-6 lignes chacune, en citant des extraits utiles si pertinents.
+    3) Plan d'actions « Avoir » : 7 steps maximum, SMART, horizon 90 jours.
+    4) Prochaines relances internes (format agenda) pour le manager.
+    5) Ton : clair, direct, sans blabla.
+
+    Voici les notes brutes :
+
+    ${blocks}`;
+
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          messages: [
+            { role: "system", content: "Tu écris des synthèses actionnables pour commerciaux. Garde un style clair et concret." },
+            { role: "user", content: prompt }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erreur de l'API OpenAI: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      const resultText = data.choices[0]?.message?.content || "Aucune réponse de l'IA.";
+      setSynthesisText(resultText);
+
+    } catch (error) {
+      console.error(error);
+      setSynthesisText(`Une erreur est survenue : ${error.message}`);
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
+  
+  const handleAddToSession9 = () => {
+    const prev = notes.s9.actions || "";
+    const newActions = (prev ? (prev + "\n\n--- SYNTHÈSE IA ---\n\n") : "") + synthesisText;
+    handleNoteChange('s9', 'actions', newActions);
+    alert("Synthèse ajoutée à la Session 9 • Actions.");
+    setIsSynthesisOpen(false);
+  };
+
 
   return (
     <div className="app" data-theme={settings.theme}>
@@ -153,6 +226,8 @@ function App() {
         onUserChange={setUser}
         onThemeToggle={handleThemeToggle} 
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onSynthesize={handleSynthesize}
+        isSynthesizing={isSynthesizing}
       />
       <main>
         <div className="grid">
@@ -170,6 +245,14 @@ function App() {
           />
         </div>
       </main>
+      <SynthesisModal
+        isOpen={isSynthesisOpen}
+        isSynthesizing={isSynthesizing}
+        text={synthesisText}
+        onClose={() => setIsSynthesisOpen(false)}
+        onCopyToClipboard={() => navigator.clipboard.writeText(synthesisText)}
+        onAddToSession9={handleAddToSession9}
+      />
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

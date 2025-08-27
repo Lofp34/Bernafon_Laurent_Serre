@@ -1,4 +1,4 @@
-export default function Header({ user, onUserChange, onThemeToggle, onOpenSettings }) {
+export default function Header({ user, onUserChange, onThemeToggle, onOpenSettings, onSynthesize, isSynthesizing }) {
   return (
     <header>
       <div className="brand"><span className="dot"></span> Bernafon • <span className="muted">Plan de vente & Notes</span></div>
@@ -17,7 +17,14 @@ export default function Header({ user, onUserChange, onThemeToggle, onOpenSettin
         <span className="save-indicator" id="saveIndicator">—</span>
       </div>
       <div className="row">
-        <button id="synthBtn" className="btn-primary">Synthèse des notes (IA)</button>
+        <button 
+          id="synthBtn" 
+          className="btn-primary" 
+          onClick={onSynthesize} 
+          disabled={isSynthesizing}
+        >
+          {isSynthesizing ? "Synthèse en cours…" : "Synthèse des notes (IA)"}
+        </button>
         <button id="exportBtn">Exporter en PDF</button>
         <button id="settingsBtn" className="btn-ghost" title="Paramètres" onClick={onOpenSettings}>⚙️</button>
         <button id="themeBtn" className="btn-ghost" title="Basculer clair/sombre" onClick={onThemeToggle}>🌓</button>
