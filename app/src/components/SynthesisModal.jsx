@@ -1,35 +1,39 @@
-import { SESSIONS } from '../data/constants';
+import ReactMarkdown from 'react-markdown';
 
-export default function SynthesisModal({ 
-  isOpen, 
-  isSynthesizing, 
-  text, 
-  onClose, 
-  onCopyToClipboard, 
-  onAddToSession9 
-}) {
-  if (!isOpen) {
-    return null;
-  }
+export default function SynthesisModal({ isOpen, isSynthesizing, text, onClose, onCopyToClipboard, onAddToSession9 }) {
+  if (!isOpen) return null;
 
   return (
-    <div className="modal show" role="dialog" aria-modal="true" aria-label="Synthèse des notes">
-      <div className="card" style={{width: 'min(900px, 95vw)'}}>
-        <header className="row">
-          <strong>🧠 Synthèse des notes</strong>
-          <div className="spacer"></div>
-          <button className="btn-ghost" aria-label="Fermer" onClick={onClose}>✖</button>
-        </header>
-        <div className="content">
-          <div style={{whiteSpace: 'pre-wrap', lineHeight: 1.45, maxHeight: '60vh', overflow: 'auto'}}>
-            {isSynthesizing ? "Génération en cours, veuillez patienter..." : text}
-          </div>
-          <div className="row" style={{marginTop: '12px'}}>
-            <button onClick={onCopyToClipboard} className="btn-primary" disabled={isSynthesizing}>Copier</button>
-            <button onClick={onAddToSession9} disabled={isSynthesizing}>Ajouter à Session 9</button>
-            <button onClick={onClose}>Fermer</button>
-          </div>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Synthèse des Notes</h3>
+          <button onClick={onClose} className="btn-ghost">✕</button>
         </div>
+        <div className="modal-content">
+          {isSynthesizing ? (
+            <div className="loading">
+              <div className="spinner"></div>
+              <p>Génération de la synthèse en cours...</p>
+            </div>
+          ) : text ? (
+            <div className="synthesis-content">
+              <ReactMarkdown>{text}</ReactMarkdown>
+            </div>
+          ) : (
+            <p>Aucune synthèse disponible</p>
+          )}
+        </div>
+        {text && !isSynthesizing && (
+          <div className="modal-footer">
+            <button onClick={onCopyToClipboard} className="btn-secondary">
+              📋 Copier
+            </button>
+            <button onClick={onAddToSession9} className="btn-primary">
+              ➕ Ajouter à Session 9
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

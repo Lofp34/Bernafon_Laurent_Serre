@@ -4,7 +4,7 @@ import { SESSIONS, SUBFIELDS } from '../data/constants';
 
 export default function NotesPanel({ notes, chatHistory, activeTab, onTabChange, onNoteChange, onChatSubmit, onClearChat }) {
   const [prompt, setPrompt] = useState("");
-  const [openSessionId, setOpenSessionId] = useState(SESSIONS[0]?.id);
+  const [openSessionId, setOpenSessionId] = useState(null); // Toutes les cartes fermées par défaut
 
   const handleSend = () => {
     if (prompt.trim()) {
