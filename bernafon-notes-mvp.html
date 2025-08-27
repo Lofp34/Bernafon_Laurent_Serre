@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bernafon — Plan de vente & Notes (MVP)</title>
+  <meta name="description" content="MVP prise de notes par session + export PDF + synthèse IA (localStorage)">
+  <style>
+    /* ====== Design tokens (HIG-like, Vercel/OpenAI vibes) ====== */
+    :root {
+      --bg: #f6f7f8;
+      --panel: #ffffff;
+      --text: #0b0f0e;
+      --muted: #67707a;
+      --primary: #0d1f17;
+      --accent: #7ab0a7;
+      --accent-2: #c7d7d2;
+      --beige: #efece7;
+      --ring: rgba(0,0,0,0.08);
+      --shadow: 0 10px 30px rgba(0,0,0,0.08);
+      --radius: 16px;
+    }
+    [data-theme="dark"] {
+      --bg: #0b0f0e;
+      --panel: #111514;
+      --text: #f3f5f5;
+      --muted: #98a2ad;
+      --primary: #d9ffe8;
+      --accent: #7ab0a7;
+      --accent-2: #26302c;
+      --beige: #1a1e1c;
+      --ring: rgba(255,255,255,0.12);
+      --shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,ui-sans-serif,system-ui;
+      background: linear-gradient(180deg,var(--bg), var(--beige));
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+    .app{
+      display:grid;
+      grid-template-rows:auto 1fr;
+      height:100vh;
+    }
+    header{
+      position:sticky; top:0; z-index:5;
+      display:flex; align-items:center; gap:12px;
+      padding:12px 16px;
+      backdrop-filter:saturate(1.2) blur(12px);
+      background:color-mix(in oklab, var(--panel) 86%, transparent);
+      border-bottom:1px solid var(--ring);
+    }
+    header .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:700;
+      letter-spacing:.3px;
+    }
+    .dot{width:10px;height:10px;border-radius:999px;
+      background:radial-gradient(circle at 30% 30%, #a2f0cf, #6cb39e 60%, #3a6b5f);
+      box-shadow:0 0 8px rgba(122,176,167,.6);
+    }
+    .muted{color:var(--muted); font-weight:500}
+    .spacer{flex:1}
+    .row{display:flex; gap:8px; align-items:center}
+    input[type="text"], input[type="email"], textarea, select{
+      width:100%; padding:10px 12px; border-radius:12px;
+      border:1px solid var(--ring); background:var(--panel); color:var(--text);
+      outline:none; transition:border .2s, box-shadow .2s;
+    }
+    textarea{min-height:120px; resize:vertical; line-height:1.4}
+    input:focus, textarea:focus, select:focus{
+      border-color:color-mix(in oklab, var(--accent), var(--ring));
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--accent) 18%, transparent);
+    }
+    button{
+      appearance:none; border:1px solid var(--ring); background:var(--panel);
+      border-radius:12px; padding:10px 14px; cursor:pointer; color:var(--text);
+      box-shadow:var(--shadow); font-weight:600;
+    }
+    button:hover{filter:brightness(1.02)}
+    .btn-primary{
+      background:linear-gradient(180deg, color-mix(in oklab, var(--accent) 30%, var(--panel)), var(--accent));
+      border-color:color-mix(in oklab, var(--accent) 40%, var(--ring));
+      color:#0b0f0e;
+    }
+    .btn-ghost{background:transparent; box-shadow:none}
+    .status{font-size:12px}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--ring); background:var(--panel); font-size:12px}
+    .danger{color:#b00020}
+    /* ====== Layout main ====== */
+    main{ padding:12px; height:calc(100vh - 60px) }
+    .grid{
+      display:grid; gap:12px; height:100%;
+      grid-template-columns: 1.1fr 1fr;
+    }
+    .panel{
+      height:100%; border:1px solid var(--ring); border-radius:var(--radius);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--panel) 88%, transparent), var(--panel));
+      box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column;
+    }
+    .panel-header{
+      display:flex; align-items:center; justify-content:space-between; padding:10px 12px;
+      border-bottom:1px solid var(--ring);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--panel) 90%, transparent), color-mix(in oklab, var(--panel) 60%, var(--beige)));
+    }
+    .panel-body{flex:1; min-height:0; overflow:auto}
+    .iframe-wrap{height:100%; background:var(--beige)}
+    iframe{width:100%; height:100%; border:0; background:white}
+    /* Tabs right side */
+    .tabs{display:flex; gap:8px; padding:8px 10px; border-bottom:1px solid var(--ring)}
+    .tab{padding:8px 12px; border-radius:999px; cursor:pointer; border:1px solid var(--ring); background:var(--panel);}
+    .tab.active{background:var(--accent); color:#0b0f0e; border-color:color-mix(in oklab, var(--accent) 60%, var(--ring));}
+    .tabpanes{flex:1; min-height:0; overflow:auto}
+    /* Accordions for sessions */
+    details{
+      border-top:1px solid var(--ring);
+      background:color-mix(in oklab, var(--panel) 98%, transparent);
+    }
+    details[open]{background:color-mix(in oklab, var(--accent-2) 18%, var(--panel));}
+    summary{
+      cursor:pointer; padding:14px 14px; font-weight:700; outline:none;
+      display:flex; align-items:center; justify-content:space-between;
+      list-style:none;
+    }
+    summary::-webkit-details-marker{display:none}
+    .badge{font-size:12px; border:1px solid var(--ring); border-radius:8px; padding:4px 8px; background:var(--panel)}
+    .section{padding:0 14px 16px}
+    .field{margin:10px 0}
+    .field label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+    /* Chat */
+    .chat-log{padding:12px; display:flex; flex-direction:column; gap:10px}
+    .msg{padding:10px 12px; border-radius:12px; max-width:90%}
+    .user{background:var(--accent); color:#0b0f0e; align-self:flex-end}
+    .assistant{background:var(--panel); border:1px solid var(--ring)}
+    .chat-input{display:flex; gap:8px; padding:10px; border-top:1px solid var(--ring)}
+    .chat-input textarea{min-height:44px; max-height:160px}
+    .right-actions{display:flex; gap:8px; align-items:center; padding:8px 10px}
+    /* Footer sticky export bar */
+    .export-bar{position:sticky; bottom:0; display:flex; gap:8px; align-items:center; justify-content:flex-end; padding:8px 10px; border-top:1px solid var(--ring); background:color-mix(in oklab, var(--panel) 92%, transparent)}
+    /* Modals */
+    .modal{position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.25); z-index:50}
+    .modal.show{display:grid}
+    .modal .card{width:min(720px, 94vw); max-height:84vh; overflow:auto; background:var(--panel); color:var(--text); border:1px solid var(--ring); border-radius:16px; box-shadow:var(--shadow)}
+    .card header{position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--ring); padding:12px 16px}
+    .card .content{padding:16px}
+    .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    .small{font-size:12px; color:var(--muted)}
+    .save-indicator{font-size:12px; color:var(--muted)}
+    /* Print */
+    @media print{
+      header, .grid > .panel:first-child, .tabs, .right-actions, .export-bar, .modal{ display:none !important; }
+      body{ background:white }
+      .panel{ border:none; box-shadow:none }
+      .print-wrap{ display:block }
+      .print-wrap h1{ font-size:22px; margin:0 0 8px 0 }
+      .print-wrap h2{ font-size:16px; margin:16px 0 8px }
+      .print-wrap .kv{ font-size:12px; color:#333 }
+      .print-wrap .bloc{ page-break-inside:avoid; margin-bottom:12px }
+      textarea{ display:none }
+      .readonly{ white-space:pre-wrap; border:1px solid #ddd; padding:8px; border-radius:8px; background:#fafafa }
+    }
+  </style>
+</head>
+<body data-theme="light">
+<div class="app">
+  <header>
+    <div class="brand"><span class="dot"></span> Bernafon • <span class="muted">Plan de vente & Notes</span></div>
+    <div class="spacer"></div>
+    <div class="row" id="userRow">
+      <input id="fullName" type="text" placeholder="Prénom Nom" style="width:220px">
+      <button class="btn-ghost" id="switchUserBtn" title="Changer d'utilisateur">Changer</button>
+      <span class="save-indicator" id="saveIndicator">—</span>
+    </div>
+    <div class="row">
+      <button id="synthBtn" class="btn-primary">Synthèse des notes (IA)</button>
+      <button id="exportBtn">Exporter en PDF</button>
+      <button id="settingsBtn" class="btn-ghost" title="Paramètres">⚙️</button>
+      <button id="themeBtn" class="btn-ghost" title="Basculer clair/sombre">🌓</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <!-- LEFT: Plan de vente viewer -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="row">
+            <strong>Plan de vente – Visionneuse</strong>
+            <span class="pill">déroulez pendant la formation</span>
+          </div>
+          <div class="row">
+            <input id="planUrl" type="text" placeholder="URL du plan (iframe)" />
+            <button id="reloadPlanBtn">Charger</button>
+          </div>
+        </div>
+        <div class="panel-body iframe-wrap">
+          <iframe id="planFrame" src="about:blank" referrerpolicy="no-referrer"></iframe>
+        </div>
+      </section>
+
+      <!-- RIGHT: Notes & Chat -->
+      <section class="panel">
+        <div class="tabs">
+          <div class="tab active" data-tab="notes">Notes</div>
+          <div class="tab" data-tab="chat">Chat IA</div>
+        </div>
+        <div class="tabpanes">
+          <!-- NOTES TAB -->
+          <div id="pane-notes">
+            <div class="right-actions">
+              <span class="small">Autosave localStorage • Données locales (alpha)</span>
+            </div>
+            <div id="accordion">
+              <!-- Sessions injected by JS -->
+            </div>
+          </div>
+          <!-- CHAT TAB -->
+          <div id="pane-chat" style="display:none; height:100%; display:flex; flex-direction:column">
+            <div class="chat-log" id="chatLog" aria-live="polite"></div>
+            <div class="chat-input">
+              <textarea id="chatPrompt" placeholder="Pose une question (ex.: Aide-moi à formuler mon plan d'action pour la Session 2)…"></textarea>
+              <button id="chatSend" class="btn-primary">Envoyer</button>
+            </div>
+          </div>
+        </div>
+        <div class="export-bar">
+          <span id="charCount" class="small"></span>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal" id="settingsModal" role="dialog" aria-modal="true" aria-label="Paramètres">
+  <div class="card">
+    <header class="row">
+      <strong>Paramètres</strong>
+      <div class="spacer"></div>
+      <button class="btn-ghost" id="closeSettings">✖</button>
+    </header>
+    <div class="content">
+      <div class="row2">
+        <div>
+          <label>Clé API OpenAI (stockée en localStorage)</label>
+          <input id="apiKey" type="text" placeholder="sk-..."/>
+          <p class="small">⚠️ Alpha locale : coller votre clé ici <em>expose</em> la clé au navigateur. N’utilisez pas cette méthode en production.</p>
+        </div>
+        <div>
+          <label>Modèle</label>
+          <select id="modelSel">
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="gpt-4o">gpt-4o</option>
+          </select>
+          <label style="margin-top:10px">Fournisseur chat</label>
+          <select id="providerSel">
+            <option value="responses">Responses API (recommandé)</option>
+            <option value="conversations">Conversations API (beta)</option>
+          </select>
+          <p class="small">Synthèse utilise toujours Responses API. Le chat peut utiliser Responses <em>ou</em> Conversations (docs 2025).</p>
+        </div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--ring); margin:16px 0">
+      <div class="row2">
+        <div>
+          <label>Thème</label>
+          <div class="row">
+            <button id="setLight">Clair</button>
+            <button id="setDark">Sombre</button>
+          </div>
+        </div>
+        <div>
+          <label>Gestion</label>
+          <div class="row">
+            <button id="resetData" class="danger">Effacer mes données locales</button>
+            <button id="exportJson">Exporter JSON</button>
+            <input type="file" id="importJson" accept="application/json">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRINT TEMPLATE (hidden in screen, visible on print) -->
+<div class="print-wrap" style="display:none; padding:24px">
+  <h1>Compte rendu — Plan de vente & Notes</h1>
+  <div class="kv" id="printMeta"></div>
+  <div id="printContent"></div>
+</div>
+
+<script>
+(function(){
+  const $ = (sel, ctx=document)=>ctx.querySelector(sel);
+  const $$ = (sel, ctx=document)=>Array.from(ctx.querySelectorAll(sel));
+  const saveIndicator = $("#saveIndicator");
+
+  // ------- App State -------
+  const DEFAULT_PLAN = "https://plan-de-vente-bernafon-sidta8l.gamma.site/";
+  const SESSIONS = [
+    {id:"s1", title:"Session 1 : Structuration de l'entretien"},
+    {id:"s2", title:"Session 2 : Phase de Découverte"},
+    {id:"s3", title:"Session 3 : Mise en tension et Identification des Faiblesses Concurrentes"},
+    {id:"s4", title:"Session 4 : Traitement des objections"},
+    {id:"s5", title:"Session 5 : Closing"},
+    {id:"s6", title:"Session 6 : Offres et Progressions"},
+    {id:"s7", title:"Session 7 : Simulations d'Entretiens et Prise en Main de l'Outil IA"},
+    {id:"s8", title:"Session 8 : Élaboration et Optimisation du Plan de Prospection Individuel"},
+    {id:"s9", title:"Session 9 : Principaux enseignements"}
+  ];
+  const SUBFIELDS = [
+    {key:"inspire", label:"Ce qui m’a inspiré dans cette session"},
+    {key:"actions", label:"Ce que je vais mettre en place dans les prochains mois"}
+  ];
+
+  let state = {
+    user: { fullName: "" },
+    settings: {
+      planUrl: DEFAULT_PLAN,
+      theme: "light",
+      model: "gpt-4o-mini",
+      provider: "responses",
+      apiKey: ""
+    },
+    notes: {}, // { s1: {inspire:"",actions:""}, ... }
+    chat: { history: [] } // {role:'user'|'assistant', content:'...'}
+  };
+
+  // ------- Load/Save -------
+  function storageKey(){
+    const who = (state.user.fullName || "anonyme").trim().toLowerCase().replace(/\s+/g,"_");
+    return "bernafon_notes_" + who;
+  }
+  function save(debounced=true){
+    localStorage.setItem(storageKey(), JSON.stringify(state));
+    if(!debounced){
+      saveIndicator.textContent = "Enregistré";
+      setTimeout(()=>saveIndicator.textContent="—", 1500);
+    }else{
+      markSaving();
+      debouncedSave();
+    }
+  }
+  function markSaving(){ saveIndicator.textContent = "Enregistrement…"; }
+  const debouncedSave = debounce(()=>{
+    localStorage.setItem(storageKey(), JSON.stringify(state));
+    saveIndicator.textContent = "Enregistré";
+    setTimeout(()=>saveIndicator.textContent="—", 1200);
+  }, 600);
+  function loadFromLS(fullName){
+    const key = "bernafon_notes_" + (fullName.trim().toLowerCase().replace(/\s+/g,"_") || "anonyme");
+    const raw = localStorage.getItem(key);
+    if(raw){
+      try{ state = JSON.parse(raw); } catch(e){ console.warn("parse fail", e); }
+    } else {
+      state.user = { fullName };
+      state.settings = Object.assign(state.settings, {
+        planUrl: DEFAULT_PLAN
+      });
+      SESSIONS.forEach(s=>{
+        state.notes[s.id] = { inspire:"", actions:"" };
+      });
+    }
+    reflect();
+  }
+
+  // ------- UI Rendering -------
+  function renderAccordion(){
+    const host = $("#accordion");
+    host.innerHTML = "";
+    SESSIONS.forEach((s, idx)=>{
+      const det = document.createElement("details");
+      det.open = idx===0;
+      const sum = document.createElement("summary");
+      sum.innerHTML = `<span>${s.title}</span><span class="badge" id="badge-${s.id}">0 caractères</span>`;
+      const sec = document.createElement("div");
+      sec.className = "section";
+
+      SUBFIELDS.forEach(sf=>{
+        const div = document.createElement("div");
+        div.className = "field";
+        const id = `${s.id}_${sf.key}`;
+        div.innerHTML = `<label for="${id}">${sf.label}</label>
+          <textarea id="${id}" data-sid="${s.id}" data-key="${sf.key}" placeholder="${sf.label} — notes…"></textarea>`;
+        sec.appendChild(div);
+      });
+
+      // Champs "Prénom Nom" aux endroits indiqués (après S3 & S6 dans le brief)
+      if (s.id === "s3" || s.id === "s6"){
+        const divPN = document.createElement("div");
+        divPN.className = "field";
+        divPN.innerHTML = `<label>Prénom Nom (rappel)</label>
+          <input type="text" value="${state.user.fullName || ""}" disabled>`;
+        sec.appendChild(divPN);
+      }
+
+      det.appendChild(sum);
+      det.appendChild(sec);
+      host.appendChild(det);
+    });
+
+    // Hydrate textareas
+    SESSIONS.forEach(s=>{
+      SUBFIELDS.forEach(sf=>{
+        const el = document.getElementById(`${s.id}_${sf.key}`);
+        if(el){
+          el.value = (state.notes?.[s.id]?.[sf.key]) || "";
+          el.addEventListener("input", onNoteInput);
+        }
+      });
+      updateBadge(s.id);
+    });
+    updateCharCount();
+  }
+
+  function reflect(){
+    $("#fullName").value = state.user.fullName || "";
+    $("#planUrl").value = state.settings.planUrl || DEFAULT_PLAN;
+    $("#planFrame").src = state.settings.planUrl || DEFAULT_PLAN;
+    document.body.setAttribute("data-theme", state.settings.theme || "light");
+    renderAccordion();
+  }
+
+  // ------- Events -------
+  $("#fullName").addEventListener("change", (e)=>{
+    state.user.fullName = e.target.value.trim();
+    save(false);
+  });
+  $("#reloadPlanBtn").addEventListener("click", ()=>{
+    const url = $("#planUrl").value.trim();
+    if(url){ state.settings.planUrl = url; $("#planFrame").src = url; save(); }
+  });
+  $("#themeBtn").addEventListener("click", ()=>{
+    state.settings.theme = (state.settings.theme === "dark") ? "light" : "dark";
+    document.body.setAttribute("data-theme", state.settings.theme);
+    save(false);
+  });
+
+  // Tabs
+  $$(".tab").forEach(tab=>{
+    tab.addEventListener("click", ()=>{
+      $$(".tab").forEach(t=>t.classList.remove("active"));
+      tab.classList.add("active");
+      const id = tab.getAttribute("data-tab");
+      $("#pane-notes").style.display = (id==="notes") ? "block" : "none";
+      $("#pane-chat").style.display = (id==="chat") ? "flex" : "none";
+    });
+  });
+
+  // Settings modal
+  $("#settingsBtn").addEventListener("click", ()=>{
+    // hydrate
+    $("#apiKey").value = state.settings.apiKey || "";
+    $("#modelSel").value = state.settings.model || "gpt-4o-mini";
+    $("#providerSel").value = state.settings.provider || "responses";
+    $("#settingsModal").classList.add("show");
+  });
+  $("#closeSettings").addEventListener("click", ()=>$("#settingsModal").classList.remove("show"));
+  $("#setLight").addEventListener("click", ()=>{ state.settings.theme="light"; document.body.setAttribute("data-theme","light"); save(false); });
+  $("#setDark").addEventListener("click", ()=>{ state.settings.theme="dark"; document.body.setAttribute("data-theme","dark"); save(false); });
+  $("#apiKey").addEventListener("change", (e)=>{ state.settings.apiKey = e.target.value.trim(); save(false); });
+  $("#modelSel").addEventListener("change", (e)=>{ state.settings.model = e.target.value; save(false); });
+  $("#providerSel").addEventListener("change", (e)=>{ state.settings.provider = e.target.value; save(false); });
+
+  $("#resetData").addEventListener("click", ()=>{
+    if(confirm("Effacer toutes mes données locales pour cet utilisateur ?")){
+      localStorage.removeItem(storageKey());
+      SESSIONS.forEach(s=>state.notes[s.id] = {inspire:"",actions:""});
+      state.chat.history = [];
+      reflect();
+    }
+  });
+  $("#exportJson").addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `bernafon-notes-${(state.user.fullName||"anonyme").replace(/\s+/g,"_")}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $("#importJson").addEventListener("change", async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const text = await file.text();
+    try{
+      const obj = JSON.parse(text);
+      state = obj;
+      reflect();
+      save(false);
+      alert("Import réussi.");
+    }catch(err){
+      alert("Fichier invalide.");
+    }
+  });
+
+  // Switch user
+  $("#switchUserBtn").addEventListener("click", ()=>{
+    const who = prompt("Entrer le Prénom Nom de l'utilisateur :","");
+    if(who!==null){
+      state = {
+        user:{ fullName: who.trim() },
+        settings: state.settings, // conserver réglages globaux
+        notes:{},
+        chat:{ history: [] }
+      };
+      SESSIONS.forEach(s=>state.notes[s.id] = {inspire:"",actions:""});
+      reflect();
+      save(false);
+    }
+  });
+
+  // Notes typing
+  function onNoteInput(e){
+    const sid = e.target.dataset.sid;
+    const key = e.target.dataset.key;
+    state.notes[sid][key] = e.target.value;
+    updateBadge(sid);
+    updateCharCount();
+    save(true);
+  }
+  function updateBadge(sid){
+    const note = state.notes[sid] || {inspire:"",actions:""};
+    const len = (note.inspire?.length||0) + (note.actions?.length||0);
+    const badge = $("#badge-"+sid);
+    if(badge) badge.textContent = `${len} caractères`;
+  }
+  function updateCharCount(){
+    let total = 0;
+    SESSIONS.forEach(s=>{
+      total += (state.notes[s.id]?.inspire?.length||0) + (state.notes[s.id]?.actions?.length||0);
+    });
+    $("#charCount").textContent = `${total} caractères au total`;
+  }
+
+  // ------- Export PDF -------
+  $("#exportBtn").addEventListener("click", ()=>{
+    // Populate print template
+    const meta = $("#printMeta");
+    meta.textContent = `Participant : ${(state.user.fullName||"—")} • Date : ${new Date().toLocaleDateString()} • Source : ${state.settings.planUrl||DEFAULT_PLAN}`;
+
+    const host = $("#printContent");
+    host.innerHTML = "";
+    SESSIONS.forEach(s=>{
+      const bloc = document.createElement("div");
+      bloc.className = "bloc";
+      const h2 = document.createElement("h2");
+      h2.textContent = s.title;
+      const insp = document.createElement("div");
+      insp.innerHTML = `<strong>${SUBFIELDS[0].label}</strong>`;
+      const inspBody = document.createElement("div");
+      inspBody.className = "readonly";
+      inspBody.textContent = state.notes[s.id]?.inspire || "";
+      const act = document.createElement("div");
+      act.style.marginTop = "6px";
+      act.innerHTML = `<strong>${SUBFIELDS[1].label}</strong>`;
+      const actBody = document.createElement("div");
+      actBody.className = "readonly";
+      actBody.textContent = state.notes[s.id]?.actions || "";
+      bloc.append(h2,insp,inspBody,act,actBody);
+      host.appendChild(bloc);
+    });
+    window.print();
+  });
+
+  // ------- Tabs content - Chat IA -------
+  $("#chatSend").addEventListener("click", async ()=>{
+    const prompt = $("#chatPrompt").value.trim();
+    if(!prompt) return;
+    appendMsg("user", prompt);
+    $("#chatPrompt").value = "";
+    try{
+      const answer = await callChatAPI(prompt);
+      appendMsg("assistant", answer || "(réponse vide)");
+    }catch(err){
+      appendMsg("assistant", "Erreur : " + (err.message || err));
+    }
+  });
+
+  function appendMsg(role, text){
+    state.chat.history.push({role, content:text});
+    const div = document.createElement("div");
+    div.className = "msg " + (role==="user" ? "user":"assistant");
+    div.textContent = text;
+    $("#chatLog").appendChild(div);
+    $("#chatLog").scrollTop = $("#chatLog").scrollHeight;
+    save(true);
+  }
+
+  // ------- OpenAI calls -------
+  async function callChatAPI(userText){
+    ensureApiKey();
+    const key = state.settings.apiKey;
+    const model = state.settings.model || "gpt-4o-mini";
+
+    // Build context from last 8 turns
+    const history = state.chat.history.slice(-16);
+    const messages = [
+      { role:"system", content:"Tu es Coach IA pour commerciaux Bernafon. Aide avec pragmatisme, style franc et concret. Réponds en français." },
+      ...history.map(m=>({role:m.role, content:m.content})),
+      { role:"user", content:userText }
+    ];
+
+    if(state.settings.provider === "conversations"){
+      // Conversations API (beta) — format approximatif (peut évoluer)
+      const payload = {
+        model,
+        messages: messages.map(m=>({role:m.role, content:[{type:"text", text:m.content}]}))
+      };
+      const res = await fetch("https://api.openai.com/v1/conversations", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":"Bearer " + key
+        },
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok){
+        const text = await res.text();
+        throw new Error("Conversations API: " + text);
+      }
+      const data = await res.json();
+      // Try to read the assistant text in a robust way
+      const out = data?.output_text || data?.output?.[0]?.content?.[0]?.text || data?.choices?.[0]?.message?.content || "";
+      return out;
+    } else {
+      // Responses API — chat-style
+      const payload = {
+        model,
+        input: messages
+      };
+      const res = await fetch("https://api.openai.com/v1/responses", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":"Bearer " + key
+        },
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok){
+        const text = await res.text();
+        throw new Error("Responses API: " + text);
+      }
+      const data = await res.json();
+      const out = data?.output_text || data?.output?.[0]?.content?.[0]?.text || data?.choices?.[0]?.message?.content || "";
+      return out;
+    }
+  }
+
+  async function synthesizeNotes(){
+    ensureApiKey();
+    const key = state.settings.apiKey;
+    const model = state.settings.model || "gpt-4o-mini";
+
+    // Build a compact doc from notes
+    const blocks = SESSIONS.map(s=>{
+      const a = (state.notes[s.id]?.inspire||"").trim();
+      const b = (state.notes[s.id]?.actions||"").trim();
+      return `### ${s.title}\n- Inspirations : ${a||"(vide)"}\n- Actions envisagées : ${b||"(vide)"}`;
+    }).join("\n\n");
+
+    const who = state.user.fullName || "Participant";
+    const prompt = `Tu es Coach IA pour commerciaux Bernafon. Génère une synthèse personnelle structurée en français pour ${who}. 
+Exigences :
+1) TL;DR en 5 puces.
+2) Synthèse par session (1 à 9), 4-6 lignes chacune, en citant des extraits utiles si pertinents.
+3) Plan d'actions « Avoir » : 7 steps maximum, SMART, horizon 90 jours.
+4) Prochaines relances internes (format agenda) pour le manager.
+5) Ton : clair, direct, sans blabla.
+
+Voici les notes brutes :
+
+${blocks}`;
+
+    const payload = {
+      model,
+      input: [
+        { role:"system", content:"Tu écris des synthèses actionnables pour commerciaux. Garde un style clair et concret."},
+        { role:"user", content: prompt}
+      ]
+    };
+
+    const res = await fetch("https://api.openai.com/v1/responses", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer " + key
+      },
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok){
+      const text = await res.text();
+      throw new Error(text);
+    }
+    const data = await res.json();
+    const out = data?.output_text || data?.output?.[0]?.content?.[0]?.text || data?.choices?.[0]?.message?.content || "";
+    return out;
+  }
+
+  $("#synthBtn").addEventListener("click", async ()=>{
+    const btn = $("#synthBtn");
+    const old = btn.textContent;
+    btn.textContent = "Synthèse en cours…";
+    btn.disabled = true;
+    try{
+      const text = await synthesizeNotes();
+      showSynthesis(text);
+    }catch(err){
+      alert("Erreur synthèse : " + (err.message || err));
+    }finally{
+      btn.textContent = old;
+      btn.disabled = false;
+    }
+  });
+
+  function showSynthesis(text){
+    const modal = document.createElement("div");
+    modal.className = "modal show";
+    modal.innerHTML = `<div class="card" style="width:min(900px,95vw)">
+      <header class="row">
+        <strong>🧠 Synthèse des notes</strong>
+        <div class="spacer"></div>
+        <button class="btn-ghost" aria-label="Fermer">✖</button>
+      </header>
+      <div class="content">
+        <div style="white-space:pre-wrap; line-height:1.45" id="synthText"></div>
+        <div class="row" style="margin-top:12px">
+          <button id="copySynth" class="btn-primary">Copier</button>
+          <button id="addToS9">Ajouter à Session 9</button>
+          <button id="closeSynth">Fermer</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    const card = $(".card", modal);
+    $(".btn-ghost", card).onclick = ()=>document.body.removeChild(modal);
+    $("#closeSynth", card).onclick = ()=>document.body.removeChild(modal);
+    $("#copySynth", card).onclick = ()=>{
+      navigator.clipboard.writeText(text);
+      alert("Copié dans le presse-papiers.");
+    };
+    $("#addToS9", card).onclick = ()=>{
+      const prev = state.notes.s9.actions || "";
+      state.notes.s9.actions = (prev ? (prev + "\n\n") : "") + text;
+      reflect();
+      save(false);
+      alert("Ajouté à la Session 9 • Actions.");
+    };
+    $("#synthText", card).textContent = text;
+  }
+
+  function ensureApiKey(){
+    if(!state.settings.apiKey){
+      const k = prompt("Clé API OpenAI (sk-...) — stockée en local (non sécurisé).");
+      if(!k) throw new Error("Pas de clé API.");
+      state.settings.apiKey = k.trim();
+      save(false);
+    }
+  }
+
+  // Helpers
+  function debounce(fn, wait){
+    let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), wait); };
+  }
+
+  // Init
+  const defaultUser = localStorage.getItem("bernafon_last_user") || "";
+  if(defaultUser){
+    loadFromLS(defaultUser);
+  }else{
+    state.user.fullName = "";
+    SESSIONS.forEach(s=>state.notes[s.id] = {inspire:"",actions:""});
+    reflect();
+  }
+  $("#fullName").addEventListener("change", (e)=>{
+    localStorage.setItem("bernafon_last_user", e.target.value.trim());
+  });
+
+  // Load default plan URL on first visit
+  if(!state.settings.planUrl){ state.settings.planUrl = DEFAULT_PLAN; }
+  $("#planUrl").value = state.settings.planUrl;
+  $("#planFrame").src = state.settings.planUrl;
+
+  // Keyboard UX: Ctrl/Cmd+Enter to send chat
+  $("#chatPrompt").addEventListener("keydown", (e)=>{
+    if((e.metaKey || e.ctrlKey) && e.key === "Enter"){
+      $("#chatSend").click();
+    }
+  });
+
+})();</script>
+</body>
+</html>
