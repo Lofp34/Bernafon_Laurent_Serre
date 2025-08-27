@@ -1,0 +1,52 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Spécificité : Structure des Données Initiales
+
+Cette règle documente les structures de données fondamentales de l'application, tirées de `[bernafon-notes-mvp.html](mdc:bernafon-notes-mvp.html)`. Ces constantes doivent être la source de vérité pour le contenu dynamique.
+
+## Constantes Principales
+
+### `SESSIONS`
+Liste des sessions de formation. C'est un tableau d'objets, chacun avec un `id` et un `title`.
+```javascript
+const SESSIONS = [
+  {id:"s1", title:"Session 1 : Structuration de l'entretien"},
+  {id:"s2", title:"Session 2 : Phase de Découverte"},
+  // ... etc
+];
+```
+
+### `SUBFIELDS`
+Définit les deux types de notes à prendre pour chaque session.
+```javascript
+const SUBFIELDS = [
+  {key:"inspire", label:"Ce qui m’a inspiré dans cette session"},
+  {key:"actions", label:"Ce que je vais mettre en place dans les prochains mois"}
+];
+```
+
+### `DEFAULT_PLAN`
+L'URL par défaut pour l'iframe du plan de vente.
+```javascript
+const DEFAULT_PLAN = "https://plan-de-vente-bernafon-sidta8l.gamma.site/";
+```
+
+## Structure de l'État (`state`)
+L'état de l'application React doit répliquer cette structure :
+```javascript
+let state = {
+  user: { fullName: "" },
+  settings: {
+    planUrl: DEFAULT_PLAN,
+    theme: "light",
+    model: "gpt-4o-mini",
+    provider: "responses",
+    apiKey: ""
+  },
+  notes: {}, // Ex: { s1: {inspire:"",actions:""}, ... }
+  chat: { history: [] } // Ex: {role:'user', content:'...'}
+};
+```

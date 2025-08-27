@@ -1,0 +1,34 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Plan d'Action : Migration de la Logique vers React
+
+Ce document sert de feuille de route pour transformer l'application React statique en une application entièrement fonctionnelle, en se basant sur la logique du fichier original `[bernafon-notes-mvp.html](mdc:bernafon-notes-mvp.html)`.
+
+### 1. Fondations des Données (State Management)
+- **Objectif :** Répliquer l'objet `state` original dans `App.jsx` avec le hook `useState`.
+- **Données à gérer :** `user`, `settings`, `notes`, `chat`.
+- **Importer les constantes :** `SESSIONS`, `SUBFIELDS`.
+
+### 2. Affichage Dynamique des Données
+- **Objectif :** Connecter l'état à l'interface pour afficher les données.
+- **Actions :**
+    - Générer dynamiquement l'accordéon des sessions dans `NotesPanel.jsx`.
+    - Charger l'URL par défaut du plan de vente dans l'iframe de `PlanPanel.jsx`.
+
+### 3. Interactivité de Base
+- **Objectif :** Gérer les actions simples de l'utilisateur.
+- **Actions :**
+    - Activer la navigation par onglets (Notes / Chat).
+    - Implémenter le changement de thème (Clair / Sombre).
+    - Permettre la mise à jour de l'URL du plan de vente.
+    - Activer la saisie et la sauvegarde des notes dans l'état.
+
+### 4. Logique Métier et API
+- **Objectif :** Implémenter les fonctionnalités complexes.
+- **Actions :**
+    - Recréer la sauvegarde automatique dans le `localStorage` (clé statique unique).
+    - Réactiver la fonction d'export PDF (avec personnalisation par le nom utilisateur).
+    - Ré-implémenter les appels à l'API OpenAI pour le chat et la synthèse.

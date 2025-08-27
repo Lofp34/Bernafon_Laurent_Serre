@@ -1,0 +1,21 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Spécificité : Logique de Sauvegarde Locale (`localStorage`)
+
+Cette règle décrit le mécanisme de persistance des données utilisé dans `[bernafon-notes-mvp.html](mdc:bernafon-notes-mvp.html)`.
+
+## Principe
+L'application sauvegarde l'intégralité de l'état (notes, paramètres, etc.) dans le `localStorage` du navigateur. Chaque utilisateur utilise son propre navigateur, donc le stockage est naturellement individuel.
+
+## Clé de Sauvegarde
+Une **clé statique et unique** (ex: `bernafon_notes`) est utilisée pour stocker toutes les données de l'application.
+
+## Rôle du Champ "Prénom Nom"
+Le champ "Prénom Nom" **n'est PAS utilisé** pour la sauvegarde. Sa seule et unique fonction est de renseigner le nom de la personne sur le document lors de l'**export en PDF**.
+
+## Fonctions Clés (simplifiées)
+- **`save()`** : Sérialise l'objet `state` en JSON et l'enregistre dans le `localStorage` sous la clé statique.
+- **`load()`** : Au démarrage de l'application, tente de charger les données depuis le `localStorage` en utilisant la clé statique. Si aucune donnée n'existe, initialise un état par défaut.

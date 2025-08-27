@@ -1,0 +1,133 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Spécificité : Implémentation de l'API OpenAI Chat
+
+Cette règle documente les spécifications techniques pour l'intégration de l'API OpenAI.
+
+## Endpoint
+L'API à utiliser est **Chat Completions**.
+- **URL :** `https://api.openai.com/v1/chat/completions`
+
+## Gestion de la Clé API
+La clé API ne doit **jamais** être codée en dur.
+- **En local :** Elle doit être chargée depuis un fichier `.env` via la variable `VITE_OPENAI_API_KEY`.
+- **En production (Vercel) :** Elle sera configurée comme une variable d'environnement sur la plateforme.
+
+---
+
+## Exemples de Code Bruts (Fournis par l'utilisateur)
+
+*NOTE : Ces blocs de code sont conservés intégralement à la demande de l'utilisateur et servent de référence principale.*
+
+### Exemple de Requête Standard (cURL)
+```bash
+curl https://api.openai.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-5",
+    "messages": [
+      {
+        "role": "developer",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "Hello!"
+      }
+    ]
+  }'
+```
+
+### Exemple de Requête avec Streaming (cURL)
+```bash
+curl https://api.openai.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-5",
+    "messages": [
+      {
+        "role": "developer",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "Hello!"
+      }
+    ],
+    "stream": true
+  }'
+```
+
+### Exemple de Réponse Standard (JSON)
+```json
+{
+  "id": "chatcmpl-B9MBs8CjcvOU2jLn4n570S5qMJKcT",
+  "object": "chat.completion",
+  "created": 1741569952,
+  "model": "gpt-4.1-2025-04-14",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello! How can I assist you today?",
+        "refusal": null,
+        "annotations": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 19,
+    "completion_tokens": 10,
+    "total_tokens": 29,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "service_tier": "default"
+}
+```
+---
+
+## Notes sur l'Implémentation
+
+### Body (Payload) pour notre application
+En se basant sur les exemples et la logique du fichier `[bernafon-notes-mvp.html](mdc:bernafon-notes-mvp.html)`, le payload de notre application sera :
+```json
+{
+  "model": "gpt-4o-mini", // ou un autre modèle selon les settings
+  "messages": [
+    {
+      "role": "system",
+      "content": "Tu es Coach IA pour commerciaux Bernafon..."
+    },
+    {
+      "role": "user",
+      "content": "Le message de l'utilisateur"
+    }
+  ],
+  "stream": true
+}
+```
+
+### Gestion de la Réponse en Streaming
+L'activation du streaming (`"stream": true`) est cruciale. Le serveur enverra une série d'événements (Server-Sent Events).
+- Chaque message est préfixé par `data: `.
+- Chaque message est un objet JSON contenant un `delta` de la réponse.
+- Le contenu textuel se trouve généralement dans `choices[0].delta.content`.
+- Il faut lire le flux de la réponse (`ReadableStream`) et le décoder au fur et à mesure pour recréer la réponse complète de manière progressive côté client.
+- Le flux se termine par un message `data: [DONE]`.
