@@ -156,12 +156,7 @@ summary::-webkit-details-marker{display:none}
 .right-actions{display:flex; gap:8px; align-items:center; padding:8px 10px}
 /* Footer sticky export bar */
 .export-bar{position:sticky; bottom:0; display:flex; gap:8px; align-items:center; justify-content:flex-end; padding:8px 10px; border-top:1px solid var(--ring); background:color-mix(in oklab, var(--panel) 92%, transparent)}
-/* Modals */
-.modal{position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.25); z-index:50}
-.modal.show{display:grid}
-.modal .card{width:min(720px, 94vw); max-height:84vh; overflow:auto; background:var(--panel); color:var(--text); border:1px solid var(--ring); border-radius:16px; box-shadow:var(--shadow)}
-.card header{position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--ring); padding:12px 16px}
-.card .content{padding:16px}
+/* Modals - Old styles removed to prevent conflicts */
 .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 .small{font-size:12px; color:var(--muted)}
 .save-indicator{font-size:12px; color:var(--muted)} 
@@ -230,4 +225,162 @@ summary::-webkit-details-marker{display:none}
 
 .msg.assistant .markdown em {
   font-style: italic;
+} 
+
+/* Modal Styles - FINAL CLEAN VERSION */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  backdrop-filter: none;
+  isolation: isolate;
+}
+
+.modal {
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  max-width: 90vw;
+  max-height: 90vh;
+  width: 800px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ring);
+  z-index: 100000;
+  position: relative;
+  isolation: isolate;
+  backdrop-filter: none;
+}
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ring);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--panel);
+  backdrop-filter: none;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.modal-content {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  background: var(--panel);
+  backdrop-filter: none;
+}
+
+.modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--ring);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  background: var(--panel);
+  backdrop-filter: none;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 20px;
+  color: var(--text);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--ring);
+  border-top: 3px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.synthesis-content {
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--panel);
+}
+
+/* Synthesis Markdown Styles */
+.synthesis-content h1,
+.synthesis-content h2,
+.synthesis-content h3,
+.synthesis-content h4,
+.synthesis-content h5,
+.synthesis-content h6 {
+  margin: 1em 0 0.5em 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.synthesis-content h1 { font-size: 1.5em; }
+.synthesis-content h2 { font-size: 1.3em; }
+.synthesis-content h3 { font-size: 1.1em; }
+
+.synthesis-content p {
+  margin: 0.8em 0;
+  color: var(--text);
+}
+
+.synthesis-content ul,
+.synthesis-content ol {
+  margin: 0.8em 0;
+  padding-left: 1.5em;
+  color: var(--text);
+}
+
+.synthesis-content li {
+  margin: 0.3em 0;
+  color: var(--text);
+}
+
+.synthesis-content strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.synthesis-content em {
+  font-style: italic;
+  color: var(--text);
+}
+
+.synthesis-content blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 1em 0;
+  padding-left: 1em;
+  color: var(--muted);
+  font-style: italic;
+  background: var(--accent-2);
+  padding: 1em;
+  border-radius: 4px;
+}
+
+.synthesis-content code {
+  background: var(--accent-2);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+  color: var(--text);
 } 

@@ -5,7 +5,7 @@ import PlanPanel from './components/PlanPanel';
 import NotesPanel from './components/NotesPanel';
 import SettingsModal from './components/SettingsModal';
 import SynthesisModal from './components/SynthesisModal';
-import { SESSIONS, DEFAULT_PLAN } from './data/constants';
+import { SESSIONS, SUBFIELDS, DEFAULT_PLAN } from './data/constants';
 
 const STORAGE_KEY = 'bernafon_notes_data';
 
@@ -152,59 +152,99 @@ function App() {
   const handleSynthesize = async () => {
     const apiKey = settings.apiKey || import.meta.env.VITE_OPENAI_API_KEY;
     if (!apiKey) {
-      alert("Veuillez entrer votre clé API OpenAI dans les paramètres.");
+      alert("Veuillez configurer votre clé API OpenAI dans les paramètres.");
+      return;
+    }
+
+    const hasNotes = Object.values(notes).some(session => 
+      Object.values(session).some(field => field.trim() !== '')
+    );
+
+    if (!hasNotes) {
+      alert("Aucune note à synthétiser. Veuillez d'abord saisir des notes.");
       return;
     }
 
     setIsSynthesizing(true);
     setIsSynthesisOpen(true);
-
-    const blocks = SESSIONS.map(s => {
-      const a = (notes[s.id]?.inspire || "").trim();
-      const b = (notes[s.id]?.actions || "").trim();
-      return `### ${s.title}\n- Inspirations : ${a || "(vide)"}\n- Actions envisagées : ${b || "(vide)"}`;
-    }).join("\n\n");
-
-    const prompt = `Tu es Coach IA pour commerciaux Bernafon. Génère une synthèse personnelle structurée en français pour ${user.fullName || "le participant"}.
-    Exigences :
-    1) TL;DR en 5 puces.
-    2) Synthèse par session (1 à 9), 4-6 lignes chacune, en citant des extraits utiles si pertinents.
-    3) Plan d'actions « Avoir » : 7 steps maximum, SMART, horizon 90 jours.
-    4) Prochaines relances internes (format agenda) pour le manager.
-    5) Ton : clair, direct, sans blabla.
-
-    Voici les notes brutes :
-
-    ${blocks}`;
+    setSynthesisText("");
 
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
+      const prompt = `Tu es un expert en formation commerciale. Analyse les notes suivantes prises lors d'une formation Bernafon et crée une synthèse structurée et professionnelle.
+
+Notes par session:
+${Object.entries(notes).map(([sessionId, sessionData]) => {
+  const session = SESSIONS.find(s => s.id === sessionId);
+  if (!session) return '';
+  
+  const sessionNotes = Object.entries(sessionData)
+    .map(([fieldKey, content]) => {
+      if (!content.trim()) return '';
+      const field = SUBFIELDS.find(f => f.key === fieldKey);
+      return field ? `- ${field.label}: ${content}` : '';
+    })
+    .filter(note => note !== '')
+    .join('\n');
+  
+  return sessionNotes ? `\n## ${session.title}\n${sessionNotes}` : '';
+}).join('\n')}
+
+Crée une synthèse qui :
+1. Résume les points clés de chaque session
+2. Identifie les actions prioritaires à mettre en place
+3. Met en évidence les apprentissages les plus importants
+4. Propose des axes d'amélioration
+
+Format de réponse : Utilise le Markdown pour structurer clairement le contenu avec des titres, sous-titres, listes à puces et mise en forme appropriée.`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: settings.model,
-          messages: [
-            { role: "system", content: "Tu écris des synthèses actionnables pour commerciaux. Garde un style clair et concret." },
-            { role: "user", content: prompt }
-          ]
-        })
+          messages: [{ role: 'user', content: prompt }],
+          stream: true,
+          temperature: 0.7,
+        }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Erreur de l'API OpenAI: ${errorText}`);
+        throw new Error(`Erreur API: ${response.status}`);
       }
-      
-      const data = await response.json();
-      const resultText = data.choices[0]?.message?.content || "Aucune réponse de l'IA.";
-      setSynthesisText(resultText);
 
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') break;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.choices?.[0]?.delta?.content) {
+                setSynthesisText(prev => prev + parsed.choices[0].delta.content);
+              }
+            } catch (e) {
+              // Ignore parsing errors for incomplete chunks
+            }
+          }
+        }
+      }
     } catch (error) {
-      console.error(error);
-      setSynthesisText(`Une erreur est survenue : ${error.message}`);
+      console.error('Erreur lors de la synthèse:', error);
+      alert(`Erreur lors de la génération de la synthèse: ${error.message}`);
+      setSynthesisText("Erreur lors de la génération de la synthèse.");
     } finally {
       setIsSynthesizing(false);
     }
