@@ -150,7 +150,8 @@ function App() {
   };
 
   const handleSynthesize = async () => {
-    if (!settings.apiKey) {
+    const apiKey = settings.apiKey || import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey) {
       alert("Veuillez configurer votre clé API OpenAI dans les paramètres.");
       return;
     }
@@ -199,7 +200,7 @@ Format de réponse : Utilise le Markdown pour structurer clairement le contenu a
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${settings.apiKey}`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
