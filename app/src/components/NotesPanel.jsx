@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { SESSIONS, SUBFIELDS } from '../data/constants';
 
-export default function NotesPanel({ notes, chatHistory, activeTab, onTabChange, onNoteChange, onChatSubmit }) {
+export default function NotesPanel({ notes, chatHistory, activeTab, onTabChange, onNoteChange, onChatSubmit, onClearChat }) {
   const [prompt, setPrompt] = useState("");
   const [openSessionId, setOpenSessionId] = useState(SESSIONS[0]?.id);
 
@@ -9,6 +10,14 @@ export default function NotesPanel({ notes, chatHistory, activeTab, onTabChange,
     if (prompt.trim()) {
       onChatSubmit(prompt.trim());
       setPrompt("");
+    }
+  };
+
+  const handleClearChat = () => {
+    if (chatHistory.length > 0) {
+      if (confirm("Êtes-vous sûr de vouloir effacer l'historique du chat ?")) {
+        onClearChat();
+      }
     }
   };
 
@@ -85,10 +94,27 @@ export default function NotesPanel({ notes, chatHistory, activeTab, onTabChange,
         </div>
         {/* CHAT TAB */}
         <div id="pane-chat" style={{display: activeTab === 'chat' ? 'flex' : 'none', height:'100%', flexDirection:'column'}}>
+          <div className="chat-header" style={{padding: '8px 12px', borderBottom: '1px solid var(--ring)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span className="small">Assistant IA Bernafon</span>
+            {chatHistory.length > 0 && (
+              <button 
+                onClick={handleClearChat}
+                className="btn-ghost"
+                style={{fontSize: '12px', padding: '4px 8px'}}
+                title="Effacer l'historique du chat"
+              >
+                🗑️ Nouveau Chat
+              </button>
+            )}
+          </div>
           <div className="chat-log" id="chatLog" aria-live="polite">
             {chatHistory.map((msg, index) => (
               <div key={index} className={`msg ${msg.role === 'user' ? 'user' : 'assistant'}`}>
-                {msg.content}
+                {msg.role === 'user' ? (
+                  msg.content
+                ) : (
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                )}
               </div>
             ))}
           </div>
