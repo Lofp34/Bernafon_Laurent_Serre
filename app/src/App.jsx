@@ -218,6 +218,10 @@ function App() {
     setIsSynthesisOpen(false);
   };
 
+  const handleClearChat = () => {
+    setChat({ history: [] });
+  };
+
 
   return (
     <div className="app" data-theme={settings.theme}>
@@ -242,6 +246,7 @@ function App() {
             onTabChange={setActiveTab}
             onNoteChange={handleNoteChange}
             onChatSubmit={handleChatSubmit}
+            onClearChat={handleClearChat}
           />
         </div>
       </main>
