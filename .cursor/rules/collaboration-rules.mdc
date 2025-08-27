@@ -1,5 +1,13 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
+# Règles de Collaboration Git
+
+- **Ne jamais commit directement sur la branche `main`**.
+- Pour toute modification ou ajout de fonctionnalité, **créer systématiquement une nouvelle branche** descriptive à partir de `main`.
+- Le nom de la branche doit suivre une convention, par exemple :
+    - `feature/...` pour les nouvelles fonctionnalités.
+    - `fix/...` pour les corrections de bugs.
+    - `refactor/...` pour les améliorations de code.
